@@ -120,10 +120,13 @@ print ('HC11 MCU sent FF in response, MCU ready to receive bootloader\n');
 
 
 
+
+
+
 # send the boot strap code, 8 bytes at a time, and if <8 bytes, pad with 0x00 to make 8 bytes
 
-bytesStart = 0x80
-bytesStop = bytesStart
+bytesStart = 0x80 ;
+bytesStop = bytesStart ;
 while bytesStop < (len(BootLoaderData)):
     if bytesStop < (len(BootLoaderData)-8) :
         bytesStop = bytesStart + 0x08 ;
@@ -133,13 +136,27 @@ while bytesStop < (len(BootLoaderData)):
     elif bytesStop < len(BootLoaderData) :
         #calc the difference;
         padBytes = 8 - (len(BootLoaderData) - bytesStop);
-        print('pad bytes = ',(hex(padBytes)),'\n');
-        sendData = BootLoaderData[bytesStart:]
+        #  print('pad bytes = ',(hex(padBytes)),'\n');
+        sendData = BootLoaderData[bytesStart:];
         sendData = sendData + b'\x00' * padBytes;
-        bytesStop = bytesStart + 0x08
+        bytesStop = bytesStart + 0x08 ;
         #    print ('bytes start: ', (hex(bytesStart)),'-',hex((bytesStop-1)), (binascii.hexlify(sendData)), '\n');
         bytesStart = bytesStop;
+#idk why this won't continue the loop, fucking whitespaces.
     print ('bytes start: ', (hex(bytesStart)),'-',hex((bytesStop-1)), (binascii.hexlify(sendData)), '\n');
+    #
+    # start writing this stuff
+    ser.reset_input_buffer();
+    ser.write(sendData);
+    # Read the serial data, we should see the data twice, once from us, once from the radio.
+    # Maybe not, looks like this might be an FTDI thing.
+    #If not, break
+    response = ser.read(ser.in_waiting)
+    print(binascii.hexlify(response));
+    if response != (sendData):
+        print ('ERROR: sending block', (hex(bytesStart)),'-',hex((bytesStop-1)), (binascii.hexlify(sendData)));
+        exit;
+
 
 
 
