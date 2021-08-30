@@ -25,6 +25,7 @@
 # along with SB9600.  If not, see <http://www.gnu.org/licenses/>.
 #--------------------------------------------------------------------------
 # 2021-08-27    BF      Inital code
+# 2021-08-29    BF      Bootstrap code working
 
 import serial
 import os
@@ -121,7 +122,7 @@ while response != b'\xFD\xFF':
 print ('HC11 MCU sent FF in response, MCU ready to receive bootloader\n');
 
 
-print ('serial settings', ser)
+#print ('serial settings', ser)
 
 # send the bootstrap code, 8 bytes at a time, and if <8 bytes, pad with 0x00 to make 8 bytes
 bytesStart = 0x80
@@ -130,8 +131,8 @@ while bytesStop < (len(BootLoaderData)):
     if bytesStop < (len(BootLoaderData)-8) :
         bytesStop = bytesStart + 0x08
         sendData = BootLoaderData[bytesStart:bytesStop]
-        print ('bytes start1: ', (hex(bytesStart)),'-',hex((bytesStop-1)), (binascii.hexlify(sendData)), '\n')
-    #bytesStart = bytesStop
+        #print ('bytes start1: ', (hex(bytesStart)),'-',hex((bytesStop-1)), (binascii.hexlify(sendData)), '\n')
+        #bytesStart = bytesStop
     elif bytesStop < len(BootLoaderData) :
         #calc the difference;
         padBytes = 8 - (len(BootLoaderData) - bytesStop)
@@ -139,11 +140,11 @@ while bytesStop < (len(BootLoaderData)):
         sendData = BootLoaderData[bytesStart:]
         sendData = sendData + b'\x00' * padBytes
         bytesStop = bytesStart + 0x08
-        print ('bytes start2: ', (hex(bytesStart)),'-',hex((bytesStop-1)), (binascii.hexlify(sendData)), '\n')
-#bytesStart = bytesStop
+        #print ('bytes start2: ', (hex(bytesStart)),'-',hex((bytesStop-1)), (binascii.hexlify(sendData)), '\n')
+        #bytesStart = bytesStop
 
     #idk why this won't continue the loop, fucking whitespaces.
-    print ('bytes start3: ', (hex(bytesStart)),'-',hex((bytesStop-1)), (binascii.hexlify(sendData)), '\n')
+    print ('bytes start: ', (hex(bytesStart)),'-',hex((bytesStop-1)), (binascii.hexlify(sendData)))
     # start writing this stuff
     ser.reset_input_buffer()
     ser.write(sendData)
@@ -151,16 +152,31 @@ while bytesStop < (len(BootLoaderData)):
     # Maybe not, looks like this might be an FTDI thing.
     #If not, break
     while ser.in_waiting < 16 :
-        sleep(0.001);
-        print ('serial buffer size' , (str(ser.in_waiting))  , '\n');
-    print ('serial buffer size', ser.in_waiting)
+        sleep(0.0001);
+    # print ('serial buffer size' , (str(ser.in_waiting))  , '\n');
+    # print ('serial buffer size', ser.in_waiting)
     response = ser.read(ser.in_waiting)
-    print('MCU Response:' , binascii.hexlify(response));
+    print('MCU Response:' , binascii.hexlify(response), '\n');
     #check that the MC echos the same 8 bytes back after sending it.
     if response != (sendData + sendData):
         print ('ERROR: sending block', (hex(bytesStart)),'-',hex((bytesStop-1)), (binascii.hexlify(sendData)))
         break;
     bytesStart = bytesStop
+
+#now switch to 115200 and look for 0x50 ACK
+
+ser.baudrate = 115200
+while ser.in_waiting < 1 :
+    sleep(0.0001)
+
+response = ser.read(ser.in_waiting)
+print('MCU Response:' , binascii.hexlify(response), '\n');
+if response == b'\x50' :
+    sys.exit('SUCCESS: Radio is Bootstrapped')
+elif response != b'\x50':
+    sys.exit('ERROR: Bootstrap Failed')
+
+
 
 
 
