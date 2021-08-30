@@ -35,15 +35,15 @@ from binascii import hexlify
 from pathlib import Path
 from time import sleep
 import random
-bus = sb9600.Serial("/dev/ttyUSB0")
+#bus = sb9600.Serial("/dev/ttyUSB0")
 
 def sbep_CRC(data):
     """Calculate SBEP checksum byte"""
-        crc = 0
-            for b in data:
-    crc = (crc + b) & 0xFF
-    crc ^= 0xFF
-        return crc
+    crc = 0
+    for b in data:
+        crc = (crc + b) & 0xFF
+        crc ^= 0xFF
+    return crc
 
 def read_from_hex_offset(file, hex_offset):
     """Fetch a single byte (or character) from file at hexadecimal offset hex_offset"""
@@ -64,6 +64,9 @@ BootLoaderSpeed = 2212;
 
 ser.baudrate = BootLoaderSpeed;
 
+#set timeout to none to make writes blocking
+ser.timeout = None
+ser.write_timeout = None
 
 #check that the boot flash file exists
 if BootloaderFile.is_file() != True:
@@ -108,7 +111,7 @@ while isReady != b'\x00\x00\x00\x00\x00\x00\x00\x00' :
 
 # send 0xFD get 0xFF then send data
 
-ser.baudrate = 2212;
+ser.baudrate = 2400;
 ser.reset_input_buffer();
 ser.write(b'\xFD');
 response = b'\x00\xFF';
@@ -118,44 +121,46 @@ while response != b'\xFD\xFF':
 print ('HC11 MCU sent FF in response, MCU ready to receive bootloader\n');
 
 
+print ('serial settings', ser)
 
-
-
-
-
-# send the boot strap code, 8 bytes at a time, and if <8 bytes, pad with 0x00 to make 8 bytes
-
-bytesStart = 0x80 ;
-bytesStop = bytesStart ;
+# send the bootstrap code, 8 bytes at a time, and if <8 bytes, pad with 0x00 to make 8 bytes
+bytesStart = 0x80
+bytesStop = bytesStart
 while bytesStop < (len(BootLoaderData)):
     if bytesStop < (len(BootLoaderData)-8) :
-        bytesStop = bytesStart + 0x08 ;
-        sendData = BootLoaderData[bytesStart:bytesStop];
-        #print ('bytes start: ', (hex(bytesStart)),'-',hex((bytesStop-1)), (binascii.hexlify(sendData)), '\n');
-        bytesStart = bytesStop;
+        bytesStop = bytesStart + 0x08
+        sendData = BootLoaderData[bytesStart:bytesStop]
+        print ('bytes start1: ', (hex(bytesStart)),'-',hex((bytesStop-1)), (binascii.hexlify(sendData)), '\n')
+    #bytesStart = bytesStop
     elif bytesStop < len(BootLoaderData) :
         #calc the difference;
-        padBytes = 8 - (len(BootLoaderData) - bytesStop);
+        padBytes = 8 - (len(BootLoaderData) - bytesStop)
         #  print('pad bytes = ',(hex(padBytes)),'\n');
-        sendData = BootLoaderData[bytesStart:];
-        sendData = sendData + b'\x00' * padBytes;
-        bytesStop = bytesStart + 0x08 ;
-        #    print ('bytes start: ', (hex(bytesStart)),'-',hex((bytesStop-1)), (binascii.hexlify(sendData)), '\n');
-        bytesStart = bytesStop;
-#idk why this won't continue the loop, fucking whitespaces.
-    print ('bytes start: ', (hex(bytesStart)),'-',hex((bytesStop-1)), (binascii.hexlify(sendData)), '\n');
-    #
+        sendData = BootLoaderData[bytesStart:]
+        sendData = sendData + b'\x00' * padBytes
+        bytesStop = bytesStart + 0x08
+        print ('bytes start2: ', (hex(bytesStart)),'-',hex((bytesStop-1)), (binascii.hexlify(sendData)), '\n')
+#bytesStart = bytesStop
+
+    #idk why this won't continue the loop, fucking whitespaces.
+    print ('bytes start3: ', (hex(bytesStart)),'-',hex((bytesStop-1)), (binascii.hexlify(sendData)), '\n')
     # start writing this stuff
-    ser.reset_input_buffer();
-    ser.write(sendData);
+    ser.reset_input_buffer()
+    ser.write(sendData)
     # Read the serial data, we should see the data twice, once from us, once from the radio.
     # Maybe not, looks like this might be an FTDI thing.
     #If not, break
+    while ser.in_waiting < 16 :
+        sleep(0.001);
+        print ('serial buffer size' , (str(ser.in_waiting))  , '\n');
+    print ('serial buffer size', ser.in_waiting)
     response = ser.read(ser.in_waiting)
-    print(binascii.hexlify(response));
-    if response != (sendData):
-        print ('ERROR: sending block', (hex(bytesStart)),'-',hex((bytesStop-1)), (binascii.hexlify(sendData)));
-        exit;
+    print('MCU Response:' , binascii.hexlify(response));
+    #check that the MC echos the same 8 bytes back after sending it.
+    if response != (sendData + sendData):
+        print ('ERROR: sending block', (hex(bytesStart)),'-',hex((bytesStop-1)), (binascii.hexlify(sendData)))
+        break;
+    bytesStart = bytesStop
 
 
 
@@ -165,13 +170,6 @@ while bytesStop < (len(BootLoaderData)):
 
 
 
-
-
-
-#check that the radio echos the same 8 bytes back after sending it.
-
-reset_input_buffer()
-ser.in_waiting;
 
 
 
