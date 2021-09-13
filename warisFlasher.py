@@ -26,6 +26,7 @@
 #--------------------------------------------------------------------------
 # 2021-08-27    BF      Inital code
 # 2021-08-29    BF      Bootstrap code working
+# 2021-09-13    BF      Added extra checking code for MCU ready
 
 import serial
 import os
@@ -56,7 +57,8 @@ def read_from_hex_offset(file, hex_offset):
 ser = serial.Serial();
 
 #define serial port
-Port = '/dev/tty.usbserial-AI03OS2W';
+#Port = '/dev/tty.usbserial-AI03OS2W';
+Port = '/dev/tty.usbserial-A70309NK'
 ser.port = Port ;
 #define bootloader file
 BootloaderFile = Path('./warisbootload1152.bin');
@@ -95,20 +97,42 @@ ser.close();
 ser.open();
 ser.baudrate = 460;
 ser.reset_input_buffer();
-isReady = b'\x00\xFF\x00\xFF\x00\xFF\x00\xFF';
-while isReady != b'\x00\x00\x00\x00\x00\x00\x00\x00' :
+isReady = b'\x00\xFF\x00\xFF\x00\xDD\x00\xDD';
+while (isReady != b'\x00\x00\x00\x00\x00\x00\x00\x00' and
+    (isReady != b'\x00\xFF\x00\xFF\x00\xFF\x00\xFF') and
+    (isReady != b'\x00\x00\xFF\x00\xFF\x00\xFF\x00') and
+    (isReady != b'\x00\xFF\x00\xFF\x00\xFF\x00\xFF') and
+    (isReady != b'\xff\x00\xff\x00\xff\x00\xff\xff') and
+    (isReady != b'\xff\x00\xff\x00\x00\xff\x00\xff') and
+    (isReady != b'\xff\x00\xff\x00\xff\x00\x00\xff') and
+    (isReady != b'\x00\xff\x00\xff\x00\xff\x00\x00') and
+    (isReady != b'\xff\x00\x00\xff\x00\xff\x00\xff') and
+    (isReady != b'\x00\xff\x00\xff\x00\x00\xff\x00')):
+    print ("looped again")
     # flush the input buffer
-    ser.reset_input_buffer();
+    ser.reset_input_buffer()
     # check that the serial buffer has at least 8 bytes
     while ser.in_waiting < 7 :
-        sleep(0.500);
+        sleep(0.500)
         print ('serial buffer size' , (str(ser.in_waiting))  , '\n');
     #Check that the MCU is ready by seeing if it's sending 0x00'
-    isReady = ser.read(8);
-    if isReady == b'\x00\x00\x00\x00\x00\x00\x00\x00' :
-        print ('HC11FL0 MCU Ready to receive Bootloader code');
+    isReady = ser.read(8)
+    if (isReady == b'\x00\x00\x00\x00\x00\x00\x00\x00' or
+    (isReady == b'\x00\xFF\x00\xFF\x00\xFF\x00\xFF') or
+    (isReady == b'\x00\x00\xFF\x00\xFF\x00\xFF\x00') or
+    (isReady == b'\x00\xFF\x00\xFF\x00\xFF\x00\xFF') or
+    (isReady == b'\xff\x00\xff\x00\xff\x00\xff\xff') or
+    (isReady == b'\xff\x00\xff\x00\x00\xff\x00\xff') or
+    (isReady == b'\xff\x00\xff\x00\xff\x00\x00\xff') or
+    (isReady == b'\x00\xff\x00\xff\x00\xff\x00\x00') or
+    (isReady == b'\xff\x00\x00\xff\x00\xff\x00\xff') or
+    (isReady == b'\x00\xff\x00\xff\x00\x00\xff\x00')):
+        print ('HC11FL0 MCU Ready to receive Bootloader code')
+        print (isReady);
     else:
-        print ('HC11FL0 MCU not ready, restart');
+        print ('HC11FL0 MCU not ready, restart')
+        print (isReady);
+
 
 # send 0xFD get 0xFF then send data
 
